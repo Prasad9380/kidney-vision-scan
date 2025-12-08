@@ -1,29 +1,42 @@
 import { useLocation, Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
-import { Activity, AlertTriangle, CheckCircle, Download, Share2, ArrowLeft, Utensils, Pill, Stethoscope, Droplets } from "lucide-react";
+import { Activity, AlertTriangle, CheckCircle, Download, Share2, ArrowLeft, Utensils, Pill, Stethoscope, Droplets, Clock, Shield } from "lucide-react";
+
+interface AnalysisResult {
+  classification: string;
+  confidence: number;
+  scanType: string;
+  findings: string;
+  affectedRegion: string;
+  recommendations: string[];
+}
 
 const Results = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { image } = location.state || {};
+  const { image, analysis, timestamp } = location.state || {};
 
-  // Simulated result - replace with actual prediction
-  const prediction = {
-    label: "Stone",
-    confidence: 94.7,
-    isNormal: false,
+  const prediction: AnalysisResult = analysis || {
+    classification: "NORMAL",
+    confidence: 0,
+    scanType: "unknown",
+    findings: "No analysis available",
+    affectedRegion: "N/A",
+    recommendations: []
   };
 
+  const isNormal = prediction.classification?.toUpperCase() === "NORMAL";
+
   const getResultColor = (label: string) => {
-    switch (label.toLowerCase()) {
-      case "normal":
+    switch (label?.toUpperCase()) {
+      case "NORMAL":
         return "text-success";
-      case "cyst":
+      case "CYST":
         return "text-blue-500";
-      case "stone":
+      case "STONE":
         return "text-amber-500";
-      case "tumor":
+      case "TUMOR":
         return "text-destructive";
       default:
         return "text-foreground";
@@ -31,22 +44,38 @@ const Results = () => {
   };
 
   const getResultBg = (label: string) => {
-    switch (label.toLowerCase()) {
-      case "normal":
+    switch (label?.toUpperCase()) {
+      case "NORMAL":
         return "bg-success/10 border-success/30";
-      case "cyst":
+      case "CYST":
         return "bg-blue-500/10 border-blue-500/30";
-      case "stone":
+      case "STONE":
         return "bg-amber-500/10 border-amber-500/30";
-      case "tumor":
+      case "TUMOR":
         return "bg-destructive/10 border-destructive/30";
       default:
         return "bg-muted border-border";
     }
   };
 
-  const guidance = {
-    stone: {
+  const getIconBg = (label: string) => {
+    switch (label?.toUpperCase()) {
+      case "NORMAL":
+        return "bg-success";
+      case "CYST":
+        return "bg-blue-500";
+      case "STONE":
+        return "bg-amber-500";
+      case "TUMOR":
+        return "bg-destructive";
+      default:
+        return "bg-muted";
+    }
+  };
+
+  // Condition-specific guidance
+  const guidance: Record<string, { diet: string[]; treatments: string[]; medications: string[] }> = {
+    STONE: {
       diet: [
         "Drink 8-12 glasses of water daily",
         "Limit sodium intake to less than 2,300mg/day",
@@ -66,8 +95,73 @@ const Results = () => {
         "Thiazide diuretics for calcium stones",
         "Allopurinol for uric acid stones"
       ]
+    },
+    CYST: {
+      diet: [
+        "Maintain a balanced, low-sodium diet",
+        "Stay well hydrated with water",
+        "Limit caffeine consumption",
+        "Avoid excessive protein intake",
+        "Include anti-inflammatory foods"
+      ],
+      treatments: [
+        "Regular monitoring with ultrasound",
+        "Aspiration and sclerotherapy for large cysts",
+        "Laparoscopic cyst decortication if symptomatic",
+        "Surgical removal in rare cases"
+      ],
+      medications: [
+        "Pain management with OTC analgesics",
+        "Blood pressure medications if needed",
+        "Antibiotics if infection develops",
+        "Tolvaptan for polycystic kidney disease"
+      ]
+    },
+    TUMOR: {
+      diet: [
+        "Focus on anti-inflammatory foods",
+        "Increase fruits and vegetables",
+        "Limit processed and red meats",
+        "Maintain healthy body weight",
+        "Consider plant-based proteins"
+      ],
+      treatments: [
+        "Partial nephrectomy (kidney-sparing surgery)",
+        "Radical nephrectomy for larger tumors",
+        "Ablation therapy for small tumors",
+        "Active surveillance for small, slow-growing tumors"
+      ],
+      medications: [
+        "Targeted therapy drugs (Sunitinib, Pazopanib)",
+        "Immunotherapy (Nivolumab, Pembrolizumab)",
+        "Combination therapies as recommended",
+        "Pain management as needed"
+      ]
+    },
+    NORMAL: {
+      diet: [
+        "Maintain a balanced, healthy diet",
+        "Stay hydrated with adequate water intake",
+        "Limit sodium and processed foods",
+        "Include plenty of fruits and vegetables",
+        "Moderate protein intake"
+      ],
+      treatments: [
+        "Continue regular health checkups",
+        "Annual kidney function tests recommended",
+        "Monitor blood pressure regularly",
+        "Maintain healthy lifestyle habits"
+      ],
+      medications: [
+        "No medications typically needed",
+        "Continue any prescribed medications",
+        "Consult doctor before starting supplements",
+        "Preventive care as recommended"
+      ]
     }
   };
+
+  const currentGuidance = guidance[prediction.classification?.toUpperCase()] || guidance.NORMAL;
 
   if (!image) {
     return (
@@ -117,31 +211,39 @@ const Results = () => {
 
       <main className="container mx-auto px-4 py-8 max-w-6xl">
         {/* Result Banner */}
-        <Card className={`mb-8 border-2 ${getResultBg(prediction.label)} animate-fade-in-up`}>
+        <Card className={`mb-8 border-2 ${getResultBg(prediction.classification)} animate-fade-in-up`}>
           <CardContent className="p-8">
             <div className="flex flex-col md:flex-row items-center gap-8">
-              <div className={`w-24 h-24 rounded-full flex items-center justify-center ${prediction.isNormal ? 'bg-success' : 'bg-amber-500'}`}>
-                {prediction.isNormal ? (
+              <div className={`w-24 h-24 rounded-full flex items-center justify-center ${getIconBg(prediction.classification)}`}>
+                {isNormal ? (
                   <CheckCircle className="w-12 h-12 text-primary-foreground" />
                 ) : (
                   <AlertTriangle className="w-12 h-12 text-primary-foreground" />
                 )}
               </div>
-              <div className="text-center md:text-left">
-                <p className="text-sm text-muted-foreground mb-1">Analysis Result</p>
-                <h1 className={`font-display text-4xl font-bold mb-2 ${getResultColor(prediction.label)}`}>
-                  {prediction.label} Detected
+              <div className="text-center md:text-left flex-1">
+                <p className="text-sm text-muted-foreground mb-1">AI Analysis Result</p>
+                <h1 className={`font-display text-4xl font-bold mb-2 ${getResultColor(prediction.classification)}`}>
+                  {prediction.classification} {isNormal ? "Kidney" : "Detected"}
                 </h1>
                 <p className="text-lg text-muted-foreground">
-                  Confidence: <span className="font-semibold text-foreground">{prediction.confidence}%</span>
+                  Confidence: <span className="font-semibold text-foreground">{prediction.confidence?.toFixed(1)}%</span>
+                  <span className="mx-2">•</span>
+                  Scan Type: <span className="font-semibold text-foreground capitalize">{prediction.scanType}</span>
                 </p>
               </div>
+              {timestamp && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Clock className="w-4 h-4" />
+                  {new Date(timestamp).toLocaleString()}
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
 
         <div className="grid lg:grid-cols-2 gap-8">
-          {/* Image & Heatmap */}
+          {/* Image & Findings */}
           <div className="space-y-6">
             <Card>
               <CardHeader>
@@ -159,35 +261,35 @@ const Results = () => {
 
             <Card variant="glass">
               <CardHeader>
-                <CardTitle>Grad-CAM Heatmap</CardTitle>
-                <CardDescription>
-                  Areas highlighted show where the AI focused its attention
-                </CardDescription>
+                <CardTitle className="flex items-center gap-2">
+                  <Shield className="w-5 h-5 text-primary" />
+                  AI Findings
+                </CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="relative">
-                  <img
-                    src={image}
-                    alt="Grad-CAM overlay"
-                    className="w-full rounded-xl"
-                  />
-                  {/* Simulated heatmap overlay */}
-                  <div className="absolute inset-0 bg-gradient-to-br from-red-500/40 via-yellow-500/30 to-transparent rounded-xl mix-blend-multiply" />
+              <CardContent className="space-y-4">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground mb-1">Analysis</p>
+                  <p className="text-foreground">{prediction.findings}</p>
                 </div>
-                <div className="mt-4 flex items-center justify-center gap-4 text-sm">
-                  <span className="flex items-center gap-2">
-                    <div className="w-4 h-4 rounded bg-gradient-to-r from-blue-500 to-cyan-500" />
-                    Low attention
-                  </span>
-                  <span className="flex items-center gap-2">
-                    <div className="w-4 h-4 rounded bg-gradient-to-r from-yellow-500 to-orange-500" />
-                    Medium
-                  </span>
-                  <span className="flex items-center gap-2">
-                    <div className="w-4 h-4 rounded bg-gradient-to-r from-red-500 to-rose-500" />
-                    High attention
-                  </span>
-                </div>
+                {prediction.affectedRegion && prediction.affectedRegion !== "N/A" && (
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground mb-1">Affected Region</p>
+                    <p className="text-foreground">{prediction.affectedRegion}</p>
+                  </div>
+                )}
+                {prediction.recommendations && prediction.recommendations.length > 0 && (
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground mb-2">AI Recommendations</p>
+                    <ul className="space-y-2">
+                      {prediction.recommendations.map((rec, index) => (
+                        <li key={index} className="flex items-start gap-2 text-sm">
+                          <div className="w-1.5 h-1.5 rounded-full bg-primary mt-2 shrink-0" />
+                          <span>{rec}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
@@ -203,7 +305,7 @@ const Results = () => {
               </CardHeader>
               <CardContent>
                 <ul className="space-y-3">
-                  {guidance.stone.diet.map((tip, index) => (
+                  {currentGuidance.diet.map((tip, index) => (
                     <li key={index} className="flex items-start gap-3">
                       <Droplets className="w-5 h-5 text-primary mt-0.5 shrink-0" />
                       <span>{tip}</span>
@@ -225,7 +327,7 @@ const Results = () => {
               </CardHeader>
               <CardContent>
                 <ul className="space-y-3">
-                  {guidance.stone.treatments.map((treatment, index) => (
+                  {currentGuidance.treatments.map((treatment, index) => (
                     <li key={index} className="flex items-start gap-3">
                       <div className="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-semibold shrink-0">
                         {index + 1}
@@ -249,7 +351,7 @@ const Results = () => {
               </CardHeader>
               <CardContent>
                 <ul className="space-y-3">
-                  {guidance.stone.medications.map((med, index) => (
+                  {currentGuidance.medications.map((med, index) => (
                     <li key={index} className="flex items-start gap-3 p-3 rounded-lg bg-muted/50">
                       <Pill className="w-4 h-4 text-muted-foreground mt-0.5 shrink-0" />
                       <span className="text-sm">{med}</span>
@@ -261,8 +363,8 @@ const Results = () => {
 
             {/* Disclaimer */}
             <div className="p-4 rounded-xl bg-warning/10 border border-warning/30">
-              <p className="text-sm text-warning-foreground">
-                <strong>Disclaimer:</strong> This analysis is for educational purposes only and should not be considered medical advice. Please consult with a qualified healthcare provider for proper diagnosis and treatment.
+              <p className="text-sm text-foreground">
+                <strong>Disclaimer:</strong> This AI analysis is for educational purposes only and should not be considered medical advice. Please consult with a qualified healthcare provider for proper diagnosis and treatment.
               </p>
             </div>
           </div>

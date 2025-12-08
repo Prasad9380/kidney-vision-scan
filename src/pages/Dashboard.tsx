@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Activity, Upload, Image, FileText, User, LogOut, Heart, Droplet, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 const Dashboard = () => {
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
@@ -52,7 +53,7 @@ const Dashboard = () => {
     }
   };
 
-  const handleAnalyze = () => {
+  const handleAnalyze = async () => {
     if (!uploadedImage) {
       toast({
         title: "No image uploaded",
@@ -64,18 +65,62 @@ const Dashboard = () => {
 
     setIsAnalyzing(true);
     
-    // Simulate analysis - replace with actual API call
-    setTimeout(() => {
-      setIsAnalyzing(false);
+    try {
+      const { data, error } = await supabase.functions.invoke('analyze-kidney-scan', {
+        body: {
+          imageBase64: uploadedImage,
+          bp: bp || undefined,
+          glucose: glucose || undefined,
+          notes: notes || undefined,
+        }
+      });
+
+      if (error) {
+        console.error("Analysis error:", error);
+        toast({
+          title: "Analysis Failed",
+          description: error.message || "Failed to analyze the scan. Please try again.",
+          variant: "destructive",
+        });
+        setIsAnalyzing(false);
+        return;
+      }
+
+      if (data?.error) {
+        toast({
+          title: "Analysis Error",
+          description: data.error,
+          variant: "destructive",
+        });
+        setIsAnalyzing(false);
+        return;
+      }
+
+      toast({
+        title: "Analysis Complete",
+        description: "Your kidney scan has been analyzed successfully.",
+      });
+
       navigate("/results", { 
         state: { 
           image: uploadedImage,
+          analysis: data.analysis,
+          timestamp: data.timestamp,
           bp,
           glucose,
           notes 
         } 
       });
-    }, 2500);
+    } catch (err) {
+      console.error("Unexpected error:", err);
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsAnalyzing(false);
+    }
   };
 
   return (
@@ -283,7 +328,7 @@ const Dashboard = () => {
                 {isAnalyzing ? (
                   <>
                     <div className="w-5 h-5 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
-                    Analyzing...
+                    Analyzing with AI...
                   </>
                 ) : (
                   <>
@@ -292,6 +337,12 @@ const Dashboard = () => {
                   </>
                 )}
               </Button>
+              
+              {isAnalyzing && (
+                <p className="text-sm text-center text-muted-foreground animate-pulse">
+                  Our AI is analyzing your kidney scan. This may take a few seconds...
+                </p>
+              )}
             </div>
           </div>
         </div>

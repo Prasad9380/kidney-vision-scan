@@ -1,0 +1,4 @@
+project_id = "shzwwcigqtuqflubdujd"
+
+[functions.analyze-kidney-scan]
+verify_jwt = false
