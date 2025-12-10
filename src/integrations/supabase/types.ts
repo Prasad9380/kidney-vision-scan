@@ -14,7 +14,84 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      profiles: {
+        Row: {
+          blood_pressure: string | null
+          created_at: string
+          full_name: string | null
+          glucose_level: string | null
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          blood_pressure?: string | null
+          created_at?: string
+          full_name?: string | null
+          glucose_level?: string | null
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          blood_pressure?: string | null
+          created_at?: string
+          full_name?: string | null
+          glucose_level?: string | null
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      scan_history: {
+        Row: {
+          affected_region: string | null
+          blood_pressure: string | null
+          classification: string
+          confidence: number
+          created_at: string
+          findings: string | null
+          glucose_level: string | null
+          id: string
+          image_url: string
+          notes: string | null
+          recommendations: Json | null
+          scan_type: string | null
+          user_id: string
+        }
+        Insert: {
+          affected_region?: string | null
+          blood_pressure?: string | null
+          classification: string
+          confidence: number
+          created_at?: string
+          findings?: string | null
+          glucose_level?: string | null
+          id?: string
+          image_url: string
+          notes?: string | null
+          recommendations?: Json | null
+          scan_type?: string | null
+          user_id: string
+        }
+        Update: {
+          affected_region?: string | null
+          blood_pressure?: string | null
+          classification?: string
+          confidence?: number
+          created_at?: string
+          findings?: string | null
+          glucose_level?: string | null
+          id?: string
+          image_url?: string
+          notes?: string | null
+          recommendations?: Json | null
+          scan_type?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

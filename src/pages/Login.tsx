@@ -1,33 +1,74 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Activity, Mail, Lock, ArrowRight, Eye, EyeOff } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
+import { useAuth } from "@/hooks/useAuth";
+import { z } from "zod";
+
+const loginSchema = z.object({
+  email: z.string().email("Invalid email address"),
+  password: z.string().min(1, "Password is required"),
+});
 
 const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const navigate = useNavigate();
-  const { toast } = useToast();
+  const { signIn, user } = useAuth();
+
+  useEffect(() => {
+    if (user) {
+      navigate("/dashboard");
+    }
+  }, [user, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setErrors({});
+    
+    // Validate input
+    const result = loginSchema.safeParse({ email, password });
+    if (!result.success) {
+      const fieldErrors: Record<string, string> = {};
+      result.error.errors.forEach((err) => {
+        if (err.path[0]) {
+          fieldErrors[err.path[0] as string] = err.message;
+        }
+      });
+      setErrors(fieldErrors);
+      return;
+    }
+
     setIsLoading(true);
     
-    // Simulate login - replace with actual auth
-    setTimeout(() => {
-      toast({
-        title: "Welcome back!",
-        description: "You've successfully signed in.",
-      });
+    const { error } = await signIn(email, password);
+
+    if (error) {
       setIsLoading(false);
-      navigate("/dashboard");
-    }, 1500);
+      if (error.message.includes("Invalid login credentials")) {
+        toast.error("Invalid credentials", {
+          description: "The email or password you entered is incorrect.",
+        });
+      } else {
+        toast.error("Sign in failed", {
+          description: error.message,
+        });
+      }
+      return;
+    }
+
+    toast.success("Welcome back!", {
+      description: "You've successfully signed in.",
+    });
+    setIsLoading(false);
+    navigate("/dashboard");
   };
 
   return (
@@ -64,14 +105,12 @@ const Login = () => {
                     required
                   />
                 </div>
+                {errors.email && <p className="text-sm text-destructive">{errors.email}</p>}
               </div>
 
               <div className="space-y-2">
                 <div className="flex justify-between items-center">
                   <Label htmlFor="password">Password</Label>
-                  <Link to="/forgot-password" className="text-xs text-primary hover:underline">
-                    Forgot password?
-                  </Link>
                 </div>
                 <div className="relative">
                   <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -92,6 +131,7 @@ const Login = () => {
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
+                {errors.password && <p className="text-sm text-destructive">{errors.password}</p>}
               </div>
 
               <Button type="submit" variant="hero" className="w-full" disabled={isLoading}>

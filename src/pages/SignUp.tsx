@@ -1,11 +1,19 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Activity, Mail, Lock, User, ArrowRight, Eye, EyeOff } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
+import { useAuth } from "@/hooks/useAuth";
+import { z } from "zod";
+
+const signUpSchema = z.object({
+  name: z.string().min(2, "Name must be at least 2 characters").max(100),
+  email: z.string().email("Invalid email address"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
+});
 
 const SignUp = () => {
   const [name, setName] = useState("");
@@ -16,22 +24,60 @@ const SignUp = () => {
   const [bp, setBp] = useState("");
   const [glucose, setGlucose] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const navigate = useNavigate();
-  const { toast } = useToast();
+  const { signUp, user } = useAuth();
+
+  useEffect(() => {
+    if (user) {
+      navigate("/dashboard");
+    }
+  }, [user, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setErrors({});
+    
+    // Validate input
+    const result = signUpSchema.safeParse({ name, email, password });
+    if (!result.success) {
+      const fieldErrors: Record<string, string> = {};
+      result.error.errors.forEach((err) => {
+        if (err.path[0]) {
+          fieldErrors[err.path[0] as string] = err.message;
+        }
+      });
+      setErrors(fieldErrors);
+      return;
+    }
+
     setIsLoading(true);
     
-    // Simulate signup - replace with actual auth
-    setTimeout(() => {
-      toast({
-        title: "Account created!",
-        description: "Welcome to KidneyAI. You can now upload your scans.",
-      });
+    const { error } = await signUp(email, password, {
+      full_name: name,
+      blood_pressure: bp || undefined,
+      glucose_level: glucose || undefined,
+    });
+
+    if (error) {
       setIsLoading(false);
-      navigate("/dashboard");
-    }, 1500);
+      if (error.message.includes("already registered")) {
+        toast.error("Account already exists", {
+          description: "An account with this email already exists. Please sign in instead.",
+        });
+      } else {
+        toast.error("Sign up failed", {
+          description: error.message,
+        });
+      }
+      return;
+    }
+
+    toast.success("Account created!", {
+      description: "Welcome to KidneyAI. You can now upload your scans.",
+    });
+    setIsLoading(false);
+    navigate("/dashboard");
   };
 
   return (
@@ -68,6 +114,7 @@ const SignUp = () => {
                     required
                   />
                 </div>
+                {errors.name && <p className="text-sm text-destructive">{errors.name}</p>}
               </div>
               
               <div className="space-y-2">
@@ -84,6 +131,7 @@ const SignUp = () => {
                     required
                   />
                 </div>
+                {errors.email && <p className="text-sm text-destructive">{errors.email}</p>}
               </div>
 
               <div className="space-y-2">
@@ -107,6 +155,7 @@ const SignUp = () => {
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
+                {errors.password && <p className="text-sm text-destructive">{errors.password}</p>}
               </div>
 
               {/* Optional Vitals */}
