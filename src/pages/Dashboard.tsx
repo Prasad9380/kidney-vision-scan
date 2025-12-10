@@ -5,19 +5,21 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Activity, Upload, Image, FileText, User, LogOut, Heart, Droplet, X } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { Activity, Upload, Image, FileText, User, LogOut, Heart, Droplet, X, History } from "lucide-react";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 
 const Dashboard = () => {
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [bp, setBp] = useState("");
   const [glucose, setGlucose] = useState("");
   const [notes, setNotes] = useState("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const navigate = useNavigate();
-  const { toast } = useToast();
+  const { user, signOut } = useAuth();
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -34,6 +36,7 @@ const Dashboard = () => {
     setIsDragging(false);
     const file = e.dataTransfer.files[0];
     if (file && file.type.startsWith("image/")) {
+      setImageFile(file);
       const reader = new FileReader();
       reader.onload = (event) => {
         setUploadedImage(event.target?.result as string);
@@ -45,6 +48,7 @@ const Dashboard = () => {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file && file.type.startsWith("image/")) {
+      setImageFile(file);
       const reader = new FileReader();
       reader.onload = (event) => {
         setUploadedImage(event.target?.result as string);
@@ -53,12 +57,15 @@ const Dashboard = () => {
     }
   };
 
+  const handleSignOut = async () => {
+    await signOut();
+    navigate("/");
+  };
+
   const handleAnalyze = async () => {
-    if (!uploadedImage) {
-      toast({
-        title: "No image uploaded",
+    if (!uploadedImage || !user) {
+      toast.error("No image uploaded", {
         description: "Please upload a kidney scan image first.",
-        variant: "destructive",
       });
       return;
     }
@@ -66,6 +73,24 @@ const Dashboard = () => {
     setIsAnalyzing(true);
     
     try {
+      // Upload image to storage
+      let imageUrl = uploadedImage;
+      if (imageFile) {
+        const fileExt = imageFile.name.split('.').pop();
+        const fileName = `${user.id}/${Date.now()}.${fileExt}`;
+        
+        const { error: uploadError } = await supabase.storage
+          .from('scans')
+          .upload(fileName, imageFile);
+
+        if (!uploadError) {
+          const { data: urlData } = supabase.storage
+            .from('scans')
+            .getPublicUrl(fileName);
+          imageUrl = urlData.publicUrl;
+        }
+      }
+
       const { data, error } = await supabase.functions.invoke('analyze-kidney-scan', {
         body: {
           imageBase64: uploadedImage,
@@ -76,28 +101,43 @@ const Dashboard = () => {
       });
 
       if (error) {
-        console.error("Analysis error:", error);
-        toast({
-          title: "Analysis Failed",
+        toast.error("Analysis Failed", {
           description: error.message || "Failed to analyze the scan. Please try again.",
-          variant: "destructive",
         });
         setIsAnalyzing(false);
         return;
       }
 
       if (data?.error) {
-        toast({
-          title: "Analysis Error",
+        toast.error("Analysis Error", {
           description: data.error,
-          variant: "destructive",
         });
         setIsAnalyzing(false);
         return;
       }
 
-      toast({
-        title: "Analysis Complete",
+      // Save to scan history
+      const { error: saveError } = await supabase
+        .from('scan_history')
+        .insert({
+          user_id: user.id,
+          image_url: imageUrl,
+          classification: data.analysis.classification,
+          confidence: data.analysis.confidence,
+          scan_type: data.analysis.scanType,
+          findings: data.analysis.findings,
+          affected_region: data.analysis.affectedRegion,
+          recommendations: data.analysis.recommendations,
+          blood_pressure: bp || null,
+          glucose_level: glucose || null,
+          notes: notes || null,
+        });
+
+      if (saveError) {
+        console.error("Failed to save scan history:", saveError);
+      }
+
+      toast.success("Analysis Complete", {
         description: "Your kidney scan has been analyzed successfully.",
       });
 
@@ -113,10 +153,8 @@ const Dashboard = () => {
       });
     } catch (err) {
       console.error("Unexpected error:", err);
-      toast({
-        title: "Error",
+      toast.error("Error", {
         description: "An unexpected error occurred. Please try again.",
-        variant: "destructive",
       });
     } finally {
       setIsAnalyzing(false);
@@ -140,7 +178,7 @@ const Dashboard = () => {
             New Scan
           </Link>
           <Link to="/history" className="flex items-center gap-3 px-4 py-3 rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground transition-colors">
-            <FileText className="w-5 h-5" />
+            <History className="w-5 h-5" />
             History
           </Link>
           <Link to="/tips" className="flex items-center gap-3 px-4 py-3 rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground transition-colors">
@@ -154,7 +192,10 @@ const Dashboard = () => {
         </nav>
 
         <div className="absolute bottom-4 left-4 right-4">
-          <Button variant="ghost" className="w-full justify-start text-muted-foreground" onClick={() => navigate("/")}>
+          <div className="px-4 py-2 mb-2 text-sm text-muted-foreground truncate">
+            {user?.email}
+          </div>
+          <Button variant="ghost" className="w-full justify-start text-muted-foreground" onClick={handleSignOut}>
             <LogOut className="w-4 h-4 mr-2" />
             Sign Out
           </Button>
@@ -171,8 +212,8 @@ const Dashboard = () => {
             </div>
             <span className="font-display text-lg font-bold">KidneyAI</span>
           </Link>
-          <Button variant="ghost" size="icon">
-            <User className="w-5 h-5" />
+          <Button variant="ghost" size="icon" onClick={handleSignOut}>
+            <LogOut className="w-5 h-5" />
           </Button>
         </header>
 
@@ -218,7 +259,10 @@ const Dashboard = () => {
                           className="max-h-64 rounded-xl shadow-md mx-auto"
                         />
                         <button
-                          onClick={() => setUploadedImage(null)}
+                          onClick={() => {
+                            setUploadedImage(null);
+                            setImageFile(null);
+                          }}
                           className="absolute -top-2 -right-2 w-8 h-8 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center shadow-md hover:bg-destructive/90 transition-colors"
                         >
                           <X className="w-4 h-4" />
