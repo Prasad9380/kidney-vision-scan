@@ -1,7 +1,10 @@
 import { useLocation, Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
-import { Activity, AlertTriangle, CheckCircle, Download, Share2, ArrowLeft, Utensils, Pill, Stethoscope, Droplets, Clock, Shield } from "lucide-react";
+import { Activity, AlertTriangle, CheckCircle, Download, Share2, ArrowLeft, Utensils, Pill, Stethoscope, Droplets, Clock, Shield, Loader2 } from "lucide-react";
+import { jsPDF } from "jspdf";
+import { useState } from "react";
+import { toast } from "sonner";
 
 interface AnalysisResult {
   classification: string;
@@ -16,6 +19,7 @@ const Results = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { image, analysis, timestamp } = location.state || {};
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
 
   const prediction: AnalysisResult = analysis || {
     classification: "NORMAL",
@@ -163,6 +167,214 @@ const Results = () => {
 
   const currentGuidance = guidance[prediction.classification?.toUpperCase()] || guidance.NORMAL;
 
+  const generatePdfReport = async () => {
+    setIsGeneratingPdf(true);
+    try {
+      const pdf = new jsPDF();
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const margin = 20;
+      const contentWidth = pageWidth - margin * 2;
+      let yPos = 20;
+
+      // Header with gradient-like styling
+      pdf.setFillColor(14, 165, 233); // Primary color
+      pdf.rect(0, 0, pageWidth, 45, "F");
+      
+      pdf.setTextColor(255, 255, 255);
+      pdf.setFontSize(24);
+      pdf.setFont("helvetica", "bold");
+      pdf.text("KidneyAI Analysis Report", margin, 28);
+      
+      pdf.setFontSize(10);
+      pdf.setFont("helvetica", "normal");
+      const reportDate = timestamp ? new Date(timestamp).toLocaleString() : new Date().toLocaleString();
+      pdf.text(`Generated: ${reportDate}`, margin, 38);
+
+      yPos = 55;
+
+      // Classification Result Box
+      const classColor = prediction.classification?.toUpperCase() === "NORMAL" 
+        ? [34, 197, 94] // Green
+        : prediction.classification?.toUpperCase() === "CYST"
+        ? [59, 130, 246] // Blue
+        : prediction.classification?.toUpperCase() === "STONE"
+        ? [245, 158, 11] // Amber
+        : [239, 68, 68]; // Red for tumor
+      
+      pdf.setFillColor(classColor[0], classColor[1], classColor[2]);
+      pdf.roundedRect(margin, yPos, contentWidth, 30, 3, 3, "F");
+      
+      pdf.setTextColor(255, 255, 255);
+      pdf.setFontSize(18);
+      pdf.setFont("helvetica", "bold");
+      const resultText = `${prediction.classification} ${prediction.classification?.toUpperCase() === "NORMAL" ? "Kidney" : "Detected"}`;
+      pdf.text(resultText, margin + 10, yPos + 15);
+      
+      pdf.setFontSize(12);
+      pdf.setFont("helvetica", "normal");
+      pdf.text(`Confidence: ${prediction.confidence?.toFixed(1)}% | Scan Type: ${prediction.scanType}`, margin + 10, yPos + 24);
+
+      yPos += 40;
+
+      // Add the scan image
+      if (image) {
+        pdf.setTextColor(30, 41, 59);
+        pdf.setFontSize(14);
+        pdf.setFont("helvetica", "bold");
+        pdf.text("Uploaded Scan Image", margin, yPos);
+        yPos += 5;
+
+        try {
+          const imgData = image;
+          const imgWidth = 80;
+          const imgHeight = 60;
+          pdf.addImage(imgData, "JPEG", margin, yPos, imgWidth, imgHeight);
+          yPos += imgHeight + 10;
+        } catch (imgError) {
+          console.error("Could not add image to PDF:", imgError);
+          yPos += 10;
+        }
+      }
+
+      // AI Findings Section
+      pdf.setTextColor(30, 41, 59);
+      pdf.setFontSize(14);
+      pdf.setFont("helvetica", "bold");
+      pdf.text("AI Findings", margin, yPos);
+      yPos += 8;
+
+      pdf.setFontSize(10);
+      pdf.setFont("helvetica", "normal");
+      pdf.setTextColor(71, 85, 105);
+      
+      const findingsLines = pdf.splitTextToSize(prediction.findings, contentWidth);
+      pdf.text(findingsLines, margin, yPos);
+      yPos += findingsLines.length * 5 + 5;
+
+      if (prediction.affectedRegion && prediction.affectedRegion !== "N/A") {
+        pdf.setFont("helvetica", "bold");
+        pdf.setTextColor(30, 41, 59);
+        pdf.text("Affected Region: ", margin, yPos);
+        pdf.setFont("helvetica", "normal");
+        pdf.setTextColor(71, 85, 105);
+        pdf.text(prediction.affectedRegion, margin + 35, yPos);
+        yPos += 8;
+      }
+
+      // AI Recommendations
+      if (prediction.recommendations && prediction.recommendations.length > 0) {
+        yPos += 5;
+        pdf.setFont("helvetica", "bold");
+        pdf.setTextColor(30, 41, 59);
+        pdf.text("AI Recommendations:", margin, yPos);
+        yPos += 6;
+        
+        pdf.setFont("helvetica", "normal");
+        pdf.setTextColor(71, 85, 105);
+        prediction.recommendations.forEach((rec) => {
+          const recLines = pdf.splitTextToSize(`• ${rec}`, contentWidth - 5);
+          pdf.text(recLines, margin + 5, yPos);
+          yPos += recLines.length * 5 + 2;
+        });
+      }
+
+      // New page for guidance
+      pdf.addPage();
+      yPos = 20;
+
+      // Dietary Recommendations
+      pdf.setFillColor(34, 197, 94);
+      pdf.roundedRect(margin, yPos, contentWidth, 8, 2, 2, "F");
+      pdf.setTextColor(255, 255, 255);
+      pdf.setFontSize(12);
+      pdf.setFont("helvetica", "bold");
+      pdf.text("Dietary Recommendations", margin + 5, yPos + 6);
+      yPos += 15;
+
+      pdf.setTextColor(71, 85, 105);
+      pdf.setFontSize(10);
+      pdf.setFont("helvetica", "normal");
+      currentGuidance.diet.forEach((tip) => {
+        const tipLines = pdf.splitTextToSize(`• ${tip}`, contentWidth - 5);
+        pdf.text(tipLines, margin + 5, yPos);
+        yPos += tipLines.length * 5 + 3;
+      });
+
+      yPos += 10;
+
+      // Treatment Options
+      pdf.setFillColor(14, 165, 233);
+      pdf.roundedRect(margin, yPos, contentWidth, 8, 2, 2, "F");
+      pdf.setTextColor(255, 255, 255);
+      pdf.setFontSize(12);
+      pdf.setFont("helvetica", "bold");
+      pdf.text("Treatment Options", margin + 5, yPos + 6);
+      yPos += 15;
+
+      pdf.setTextColor(71, 85, 105);
+      pdf.setFontSize(10);
+      pdf.setFont("helvetica", "normal");
+      currentGuidance.treatments.forEach((treatment, index) => {
+        const treatmentLines = pdf.splitTextToSize(`${index + 1}. ${treatment}`, contentWidth - 5);
+        pdf.text(treatmentLines, margin + 5, yPos);
+        yPos += treatmentLines.length * 5 + 3;
+      });
+
+      yPos += 10;
+
+      // Possible Medications
+      pdf.setFillColor(245, 158, 11);
+      pdf.roundedRect(margin, yPos, contentWidth, 8, 2, 2, "F");
+      pdf.setTextColor(255, 255, 255);
+      pdf.setFontSize(12);
+      pdf.setFont("helvetica", "bold");
+      pdf.text("Possible Medications", margin + 5, yPos + 6);
+      yPos += 15;
+
+      pdf.setTextColor(71, 85, 105);
+      pdf.setFontSize(10);
+      pdf.setFont("helvetica", "normal");
+      currentGuidance.medications.forEach((med) => {
+        const medLines = pdf.splitTextToSize(`• ${med}`, contentWidth - 5);
+        pdf.text(medLines, margin + 5, yPos);
+        yPos += medLines.length * 5 + 3;
+      });
+
+      yPos += 15;
+
+      // Disclaimer
+      pdf.setFillColor(254, 243, 199);
+      pdf.roundedRect(margin, yPos, contentWidth, 25, 2, 2, "F");
+      pdf.setTextColor(146, 64, 14);
+      pdf.setFontSize(9);
+      pdf.setFont("helvetica", "bold");
+      pdf.text("Disclaimer:", margin + 5, yPos + 8);
+      pdf.setFont("helvetica", "normal");
+      const disclaimerText = "This AI analysis is for educational purposes only and should not be considered medical advice. Please consult with a qualified healthcare provider for proper diagnosis and treatment.";
+      const disclaimerLines = pdf.splitTextToSize(disclaimerText, contentWidth - 10);
+      pdf.text(disclaimerLines, margin + 5, yPos + 14);
+
+      // Footer
+      const pageCount = pdf.getNumberOfPages();
+      for (let i = 1; i <= pageCount; i++) {
+        pdf.setPage(i);
+        pdf.setFontSize(8);
+        pdf.setTextColor(148, 163, 184);
+        pdf.text(`Page ${i} of ${pageCount} | KidneyAI Report`, pageWidth / 2, pdf.internal.pageSize.getHeight() - 10, { align: "center" });
+      }
+
+      // Save the PDF
+      const fileName = `KidneyAI_Report_${prediction.classification}_${new Date().toISOString().split("T")[0]}.pdf`;
+      pdf.save(fileName);
+      toast.success("PDF report downloaded successfully!");
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+      toast.error("Failed to generate PDF report");
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  };
+
   if (!image) {
     return (
       <div className="min-h-screen mesh-background flex items-center justify-center p-4">
@@ -201,9 +413,13 @@ const Results = () => {
               <Share2 className="w-4 h-4 mr-2" />
               Share
             </Button>
-            <Button variant="default" size="sm">
-              <Download className="w-4 h-4 mr-2" />
-              Download Report
+            <Button variant="default" size="sm" onClick={generatePdfReport} disabled={isGeneratingPdf}>
+              {isGeneratingPdf ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Download className="w-4 h-4 mr-2" />
+              )}
+              {isGeneratingPdf ? "Generating..." : "Download Report"}
             </Button>
           </div>
         </div>
