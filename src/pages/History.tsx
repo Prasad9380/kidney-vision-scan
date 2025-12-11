@@ -2,6 +2,16 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Activity, Upload, Heart, User, LogOut, History as HistoryIcon, Eye, Trash2, AlertTriangle, CheckCircle, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -25,6 +35,8 @@ interface ScanRecord {
 const History = () => {
   const [scans, setScans] = useState<ScanRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [scanToDelete, setScanToDelete] = useState<string | null>(null);
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
 
@@ -75,18 +87,28 @@ const History = () => {
     });
   };
 
-  const handleDeleteScan = async (scanId: string) => {
+  const openDeleteDialog = (scanId: string) => {
+    setScanToDelete(scanId);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteScan = async () => {
+    if (!scanToDelete) return;
+
     const { error } = await supabase
       .from('scan_history')
       .delete()
-      .eq('id', scanId);
+      .eq('id', scanToDelete);
 
     if (error) {
       toast.error("Failed to delete scan");
     } else {
       toast.success("Scan deleted");
-      setScans(scans.filter(s => s.id !== scanId));
+      setScans(scans.filter(s => s.id !== scanToDelete));
     }
+
+    setDeleteDialogOpen(false);
+    setScanToDelete(null);
   };
 
   const getResultColor = (label: string) => {
@@ -247,7 +269,7 @@ const History = () => {
                           variant="ghost"
                           size="icon"
                           className="text-muted-foreground hover:text-destructive"
-                          onClick={() => handleDeleteScan(scan.id)}
+                          onClick={() => openDeleteDialog(scan.id)}
                         >
                           <Trash2 className="w-4 h-4" />
                         </Button>
@@ -260,6 +282,27 @@ const History = () => {
           )}
         </div>
       </main>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Scan</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this scan? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteScan}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
