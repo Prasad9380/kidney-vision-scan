@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
@@ -20,6 +20,26 @@ const Dashboard = () => {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
+
+  // Pre-fill vitals from profile
+  useEffect(() => {
+    const fetchProfile = async () => {
+      if (!user) return;
+
+      const { data } = await supabase
+        .from("profiles")
+        .select("blood_pressure, glucose_level")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (data) {
+        if (data.blood_pressure) setBp(data.blood_pressure);
+        if (data.glucose_level) setGlucose(data.glucose_level);
+      }
+    };
+
+    fetchProfile();
+  }, [user]);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
