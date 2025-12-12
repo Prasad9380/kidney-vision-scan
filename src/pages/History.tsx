@@ -12,7 +12,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Activity, Upload, Heart, User, LogOut, History as HistoryIcon, Eye, Trash2, AlertTriangle, CheckCircle, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
+import { Activity, Upload, Heart, User, LogOut, History as HistoryIcon, Eye, Trash2, AlertTriangle, CheckCircle, Loader2, ChevronLeft, ChevronRight, Download } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
@@ -41,6 +41,7 @@ const History = () => {
   const [scanToDelete, setScanToDelete] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
+  const [isExporting, setIsExporting] = useState(false);
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
 
@@ -138,6 +139,78 @@ const History = () => {
     setScanToDelete(null);
   };
 
+  const handleExportCSV = async () => {
+    if (!user) return;
+    setIsExporting(true);
+
+    try {
+      // Fetch all scans for export
+      const { data, error } = await supabase
+        .from('scan_history')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      if (!data || data.length === 0) {
+        toast.error("No scans to export");
+        return;
+      }
+
+      // CSV headers
+      const headers = [
+        "Date",
+        "Time",
+        "Classification",
+        "Confidence (%)",
+        "Scan Type",
+        "Findings",
+        "Affected Region",
+        "Blood Pressure",
+        "Glucose Level",
+        "Notes"
+      ];
+
+      // Convert data to CSV rows
+      const rows = data.map(scan => [
+        new Date(scan.created_at).toLocaleDateString(),
+        new Date(scan.created_at).toLocaleTimeString(),
+        scan.classification,
+        scan.confidence?.toFixed(1) || "",
+        scan.scan_type || "",
+        scan.findings?.replace(/,/g, ";") || "",
+        scan.affected_region || "",
+        scan.blood_pressure || "",
+        scan.glucose_level || "",
+        scan.notes?.replace(/,/g, ";") || ""
+      ]);
+
+      // Build CSV content
+      const csvContent = [
+        headers.join(","),
+        ...rows.map(row => row.map(cell => `"${cell}"`).join(","))
+      ].join("\n");
+
+      // Create and download file
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.setAttribute("href", url);
+      link.setAttribute("download", `kidney-scan-history-${new Date().toISOString().split('T')[0]}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      toast.success("Scan history exported successfully");
+    } catch (error) {
+      console.error("Export failed:", error);
+      toast.error("Failed to export scan history");
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   const getResultColor = (label: string) => {
     switch (label?.toUpperCase()) {
       case "NORMAL":
@@ -225,11 +298,27 @@ const History = () => {
         </header>
 
         <div className="p-6 lg:p-8 max-w-5xl mx-auto">
-          <div className="mb-8">
-            <h1 className="font-display text-3xl font-bold mb-2">Scan History</h1>
-            <p className="text-muted-foreground">
-              View your previous kidney scan analyses
-            </p>
+          <div className="flex items-start justify-between mb-8">
+            <div>
+              <h1 className="font-display text-3xl font-bold mb-2">Scan History</h1>
+              <p className="text-muted-foreground">
+                View your previous kidney scan analyses
+              </p>
+            </div>
+            {totalCount > 0 && (
+              <Button
+                variant="outline"
+                onClick={handleExportCSV}
+                disabled={isExporting}
+              >
+                {isExporting ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <Download className="w-4 h-4 mr-2" />
+                )}
+                Export CSV
+              </Button>
+            )}
           </div>
 
           {isLoading ? (
