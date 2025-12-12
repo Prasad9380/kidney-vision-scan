@@ -12,7 +12,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Activity, Upload, Heart, User, LogOut, History as HistoryIcon, Eye, Trash2, AlertTriangle, CheckCircle, Loader2, ChevronLeft, ChevronRight, Download } from "lucide-react";
+import { Activity, Upload, Heart, User, LogOut, History as HistoryIcon, Eye, Trash2, AlertTriangle, CheckCircle, Loader2, ChevronLeft, ChevronRight, Download, Filter } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
@@ -33,6 +33,8 @@ interface ScanRecord {
 }
 
 const ITEMS_PER_PAGE = 10;
+const CLASSIFICATION_FILTERS = ["All", "Normal", "Cyst", "Stone", "Tumor"] as const;
+type ClassificationFilter = typeof CLASSIFICATION_FILTERS[number];
 
 const History = () => {
   const [scans, setScans] = useState<ScanRecord[]>([]);
@@ -42,6 +44,7 @@ const History = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
   const [isExporting, setIsExporting] = useState(false);
+  const [activeFilter, setActiveFilter] = useState<ClassificationFilter>("All");
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
 
@@ -49,7 +52,7 @@ const History = () => {
 
   useEffect(() => {
     fetchScans();
-  }, [user, currentPage]);
+  }, [user, currentPage, activeFilter]);
 
   const fetchScans = async () => {
     if (!user) return;
@@ -58,15 +61,22 @@ const History = () => {
     const from = (currentPage - 1) * ITEMS_PER_PAGE;
     const to = from + ITEMS_PER_PAGE - 1;
 
+    // Build base queries
+    let countQuery = supabase.from('scan_history').select('*', { count: 'exact', head: true });
+    let dataQuery = supabase
+      .from('scan_history')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .range(from, to);
+
+    // Apply filter if not "All"
+    if (activeFilter !== "All") {
+      countQuery = countQuery.ilike('classification', activeFilter);
+      dataQuery = dataQuery.ilike('classification', activeFilter);
+    }
+
     // Fetch count and data in parallel
-    const [countResult, dataResult] = await Promise.all([
-      supabase.from('scan_history').select('*', { count: 'exact', head: true }),
-      supabase
-        .from('scan_history')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .range(from, to)
-    ]);
+    const [countResult, dataResult] = await Promise.all([countQuery, dataQuery]);
 
     if (countResult.error) {
       console.error("Failed to fetch count:", countResult.error);
@@ -144,11 +154,17 @@ const History = () => {
     setIsExporting(true);
 
     try {
-      // Fetch all scans for export
-      const { data, error } = await supabase
+      // Fetch all scans for export (with current filter)
+      let query = supabase
         .from('scan_history')
         .select('*')
         .order('created_at', { ascending: false });
+
+      if (activeFilter !== "All") {
+        query = query.ilike('classification', activeFilter);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
 
@@ -208,6 +224,29 @@ const History = () => {
       toast.error("Failed to export scan history");
     } finally {
       setIsExporting(false);
+    }
+  };
+
+  const handleFilterChange = (filter: ClassificationFilter) => {
+    setActiveFilter(filter);
+    setCurrentPage(1); // Reset to first page when filter changes
+  };
+
+  const getFilterButtonStyle = (filter: ClassificationFilter) => {
+    const isActive = activeFilter === filter;
+    if (!isActive) return "bg-muted text-muted-foreground hover:bg-muted/80";
+    
+    switch (filter) {
+      case "Normal":
+        return "bg-success text-success-foreground";
+      case "Cyst":
+        return "bg-blue-500 text-white";
+      case "Stone":
+        return "bg-amber-500 text-white";
+      case "Tumor":
+        return "bg-destructive text-destructive-foreground";
+      default:
+        return "bg-primary text-primary-foreground";
     }
   };
 
@@ -321,11 +360,27 @@ const History = () => {
             )}
           </div>
 
+          {/* Filter Buttons */}
+          <div className="flex flex-wrap items-center gap-2 mb-6">
+            <Filter className="w-4 h-4 text-muted-foreground" />
+            {CLASSIFICATION_FILTERS.map((filter) => (
+              <Button
+                key={filter}
+                size="sm"
+                variant="ghost"
+                className={`${getFilterButtonStyle(filter)} transition-colors`}
+                onClick={() => handleFilterChange(filter)}
+              >
+                {filter}
+              </Button>
+            ))}
+          </div>
+
           {isLoading ? (
             <div className="flex items-center justify-center py-12">
               <Loader2 className="w-8 h-8 animate-spin text-primary" />
             </div>
-          ) : scans.length === 0 ? (
+          ) : scans.length === 0 && activeFilter === "All" ? (
             <Card className="text-center py-12">
               <CardContent>
                 <HistoryIcon className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
@@ -336,6 +391,19 @@ const History = () => {
                 <Button variant="hero" onClick={() => navigate("/dashboard")}>
                   <Upload className="w-4 h-4 mr-2" />
                   Upload Scan
+                </Button>
+              </CardContent>
+            </Card>
+          ) : scans.length === 0 ? (
+            <Card className="text-center py-12">
+              <CardContent>
+                <Filter className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+                <h3 className="font-display text-xl font-semibold mb-2">No {activeFilter} scans found</h3>
+                <p className="text-muted-foreground mb-6">
+                  Try selecting a different filter
+                </p>
+                <Button variant="outline" onClick={() => handleFilterChange("All")}>
+                  Show All Scans
                 </Button>
               </CardContent>
             </Card>
