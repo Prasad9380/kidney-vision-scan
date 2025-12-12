@@ -12,10 +12,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Activity, Upload, Heart, User, LogOut, History as HistoryIcon, Eye, Trash2, AlertTriangle, CheckCircle, Loader2, ChevronLeft, ChevronRight, Download, Filter } from "lucide-react";
+import { Activity, Upload, Heart, User, LogOut, History as HistoryIcon, Eye, Trash2, AlertTriangle, CheckCircle, Loader2, ChevronLeft, ChevronRight, Download, Filter, Search, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
+import { Input } from "@/components/ui/input";
 
 interface ScanRecord {
   id: string;
@@ -45,14 +46,25 @@ const History = () => {
   const [totalCount, setTotalCount] = useState(0);
   const [isExporting, setIsExporting] = useState(false);
   const [activeFilter, setActiveFilter] = useState<ClassificationFilter>("All");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
 
   const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE);
 
+  // Debounce search query
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+      setCurrentPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
   useEffect(() => {
     fetchScans();
-  }, [user, currentPage, activeFilter]);
+  }, [user, currentPage, activeFilter, debouncedSearch]);
 
   const fetchScans = async () => {
     if (!user) return;
@@ -69,10 +81,17 @@ const History = () => {
       .order('created_at', { ascending: false })
       .range(from, to);
 
-    // Apply filter if not "All"
+    // Apply classification filter if not "All"
     if (activeFilter !== "All") {
       countQuery = countQuery.ilike('classification', activeFilter);
       dataQuery = dataQuery.ilike('classification', activeFilter);
+    }
+
+    // Apply search filter
+    if (debouncedSearch.trim()) {
+      const searchTerm = `%${debouncedSearch.trim()}%`;
+      countQuery = countQuery.or(`findings.ilike.${searchTerm},notes.ilike.${searchTerm}`);
+      dataQuery = dataQuery.or(`findings.ilike.${searchTerm},notes.ilike.${searchTerm}`);
     }
 
     // Fetch count and data in parallel
@@ -360,27 +379,53 @@ const History = () => {
             )}
           </div>
 
-          {/* Filter Buttons */}
-          <div className="flex flex-wrap items-center gap-2 mb-6">
-            <Filter className="w-4 h-4 text-muted-foreground" />
-            {CLASSIFICATION_FILTERS.map((filter) => (
-              <Button
-                key={filter}
-                size="sm"
-                variant="ghost"
-                className={`${getFilterButtonStyle(filter)} transition-colors`}
-                onClick={() => handleFilterChange(filter)}
-              >
-                {filter}
-              </Button>
-            ))}
+          {/* Search and Filter Controls */}
+          <div className="flex flex-col sm:flex-row gap-4 mb-6">
+            {/* Search Bar */}
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                type="text"
+                placeholder="Search by findings or notes..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10 pr-10"
+                maxLength={100}
+              />
+              {searchQuery && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7"
+                  onClick={() => setSearchQuery("")}
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              )}
+            </div>
+
+            {/* Filter Buttons */}
+            <div className="flex flex-wrap items-center gap-2">
+              <Filter className="w-4 h-4 text-muted-foreground" />
+              {CLASSIFICATION_FILTERS.map((filter) => (
+                <Button
+                  key={filter}
+                  size="sm"
+                  variant="ghost"
+                  className={`${getFilterButtonStyle(filter)} transition-colors`}
+                  onClick={() => handleFilterChange(filter)}
+                >
+                  {filter}
+                </Button>
+              ))}
+            </div>
           </div>
 
           {isLoading ? (
             <div className="flex items-center justify-center py-12">
               <Loader2 className="w-8 h-8 animate-spin text-primary" />
             </div>
-          ) : scans.length === 0 && activeFilter === "All" ? (
+          ) : scans.length === 0 && activeFilter === "All" && !debouncedSearch ? (
             <Card className="text-center py-12">
               <CardContent>
                 <HistoryIcon className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
@@ -397,13 +442,16 @@ const History = () => {
           ) : scans.length === 0 ? (
             <Card className="text-center py-12">
               <CardContent>
-                <Filter className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
-                <h3 className="font-display text-xl font-semibold mb-2">No {activeFilter} scans found</h3>
+                <Search className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+                <h3 className="font-display text-xl font-semibold mb-2">No matching scans found</h3>
                 <p className="text-muted-foreground mb-6">
-                  Try selecting a different filter
+                  {debouncedSearch 
+                    ? `No scans match "${debouncedSearch}"${activeFilter !== "All" ? ` in ${activeFilter}` : ""}`
+                    : `No ${activeFilter} scans found`
+                  }
                 </p>
-                <Button variant="outline" onClick={() => handleFilterChange("All")}>
-                  Show All Scans
+                <Button variant="outline" onClick={() => { setSearchQuery(""); handleFilterChange("All"); }}>
+                  Clear Filters
                 </Button>
               </CardContent>
             </Card>
