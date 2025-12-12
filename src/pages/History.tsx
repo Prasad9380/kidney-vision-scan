@@ -12,7 +12,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Activity, Upload, Heart, User, LogOut, History as HistoryIcon, Eye, Trash2, AlertTriangle, CheckCircle, Loader2 } from "lucide-react";
+import { Activity, Upload, Heart, User, LogOut, History as HistoryIcon, Eye, Trash2, AlertTriangle, CheckCircle, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
@@ -32,31 +32,52 @@ interface ScanRecord {
   created_at: string;
 }
 
+const ITEMS_PER_PAGE = 10;
+
 const History = () => {
   const [scans, setScans] = useState<ScanRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [scanToDelete, setScanToDelete] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
 
+  const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE);
+
   useEffect(() => {
     fetchScans();
-  }, [user]);
+  }, [user, currentPage]);
 
   const fetchScans = async () => {
     if (!user) return;
+    setIsLoading(true);
     
-    const { data, error } = await supabase
-      .from('scan_history')
-      .select('*')
-      .order('created_at', { ascending: false });
+    const from = (currentPage - 1) * ITEMS_PER_PAGE;
+    const to = from + ITEMS_PER_PAGE - 1;
 
-    if (error) {
-      console.error("Failed to fetch scans:", error);
+    // Fetch count and data in parallel
+    const [countResult, dataResult] = await Promise.all([
+      supabase.from('scan_history').select('*', { count: 'exact', head: true }),
+      supabase
+        .from('scan_history')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .range(from, to)
+    ]);
+
+    if (countResult.error) {
+      console.error("Failed to fetch count:", countResult.error);
+    } else {
+      setTotalCount(countResult.count || 0);
+    }
+
+    if (dataResult.error) {
+      console.error("Failed to fetch scans:", dataResult.error);
       toast.error("Failed to load scan history");
     } else {
-      setScans(data || []);
+      setScans(dataResult.data || []);
     }
     setIsLoading(false);
   };
@@ -104,7 +125,13 @@ const History = () => {
       toast.error("Failed to delete scan");
     } else {
       toast.success("Scan deleted");
-      setScans(scans.filter(s => s.id !== scanToDelete));
+      setTotalCount(prev => prev - 1);
+      // Refetch if last item on page was deleted
+      if (scans.length === 1 && currentPage > 1) {
+        setCurrentPage(prev => prev - 1);
+      } else {
+        setScans(scans.filter(s => s.id !== scanToDelete));
+      }
     }
 
     setDeleteDialogOpen(false);
@@ -278,6 +305,38 @@ const History = () => {
                   </CardContent>
                 </Card>
               ))}
+
+              {/* Pagination Controls */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between pt-4">
+                  <p className="text-sm text-muted-foreground">
+                    Showing {((currentPage - 1) * ITEMS_PER_PAGE) + 1}-{Math.min(currentPage * ITEMS_PER_PAGE, totalCount)} of {totalCount} scans
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(prev => prev - 1)}
+                      disabled={currentPage === 1}
+                    >
+                      <ChevronLeft className="w-4 h-4 mr-1" />
+                      Previous
+                    </Button>
+                    <span className="text-sm text-muted-foreground px-2">
+                      Page {currentPage} of {totalPages}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(prev => prev + 1)}
+                      disabled={currentPage === totalPages}
+                    >
+                      Next
+                      <ChevronRight className="w-4 h-4 ml-1" />
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
