@@ -5,22 +5,29 @@ import { cn } from "@/lib/utils";
 const Card = React.forwardRef<
   HTMLDivElement,
   React.HTMLAttributes<HTMLDivElement> & {
-    variant?: "default" | "glass" | "elevated" | "outlined";
+    variant?: "default" | "glass" | "elevated" | "outlined" | "interactive";
+    hover?: boolean;
   }
->(({ className, variant = "default", ...props }, ref) => {
+>(({ className, variant = "default", hover = false, ...props }, ref) => {
   const variants = {
     default: "bg-card text-card-foreground shadow-card border border-border/50",
     glass: "glass-card",
     elevated: "bg-card text-card-foreground shadow-xl border border-border/30",
     outlined: "bg-card text-card-foreground border-2 border-border",
+    interactive: "bg-card text-card-foreground shadow-card border border-border/50 cursor-pointer",
   };
+
+  const hoverStyles = hover || variant === "interactive"
+    ? "hover:-translate-y-1 hover:shadow-xl hover:shadow-primary/5 hover:border-primary/20 active:translate-y-0 active:shadow-lg"
+    : "";
 
   return (
     <div
       ref={ref}
       className={cn(
-        "rounded-2xl transition-all duration-300",
+        "rounded-2xl transition-all duration-200 ease-out",
         variants[variant],
+        hoverStyles,
         className
       )}
       {...props}
