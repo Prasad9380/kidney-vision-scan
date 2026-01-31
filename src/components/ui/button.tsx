@@ -5,28 +5,28 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl text-sm font-medium ring-offset-background transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl text-sm font-medium ring-offset-background transition-all duration-200 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 [&_svg]:transition-transform [&_svg]:duration-200 active:scale-[0.98]",
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground shadow-md hover:bg-primary/90 hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0",
-        destructive: "bg-destructive text-destructive-foreground shadow-md hover:bg-destructive/90 hover:shadow-lg",
-        outline: "border-2 border-primary/20 bg-background text-foreground hover:bg-primary/5 hover:border-primary/40",
-        secondary: "bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/80",
-        ghost: "hover:bg-muted hover:text-foreground",
+        default: "bg-primary text-primary-foreground shadow-md hover:bg-primary/90 hover:shadow-lg hover:-translate-y-0.5 hover:shadow-primary/25 active:translate-y-0 [&:hover_svg]:translate-x-0.5",
+        destructive: "bg-destructive text-destructive-foreground shadow-md hover:bg-destructive/90 hover:shadow-lg hover:shadow-destructive/25 hover:-translate-y-0.5 active:translate-y-0",
+        outline: "border-2 border-primary/20 bg-background text-foreground hover:bg-primary/5 hover:border-primary/40 hover:shadow-sm active:bg-primary/10",
+        secondary: "bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/80 hover:shadow-md hover:-translate-y-0.5 active:translate-y-0",
+        ghost: "hover:bg-muted hover:text-foreground active:bg-muted/80",
         link: "text-primary underline-offset-4 hover:underline",
-        hero: "bg-gradient-to-r from-primary via-primary-glow to-primary text-primary-foreground shadow-lg hover:shadow-glow hover:-translate-y-1 active:translate-y-0 font-semibold",
-        "hero-outline": "border-2 border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:border-primary-foreground/50",
-        success: "bg-success text-success-foreground shadow-md hover:bg-success/90 hover:shadow-lg",
-        warning: "bg-warning text-warning-foreground shadow-md hover:bg-warning/90",
-        glass: "bg-card/60 backdrop-blur-md border border-border/50 text-foreground hover:bg-card/80 shadow-card",
+        hero: "bg-gradient-to-r from-primary via-primary-glow to-primary text-primary-foreground shadow-lg hover:shadow-glow hover:-translate-y-1 hover:shadow-primary/30 active:translate-y-0 font-semibold [&:hover_svg]:translate-x-1",
+        "hero-outline": "border-2 border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:border-primary-foreground/50 hover:-translate-y-0.5 active:translate-y-0",
+        success: "bg-success text-success-foreground shadow-md hover:bg-success/90 hover:shadow-lg hover:shadow-success/25 hover:-translate-y-0.5 active:translate-y-0",
+        warning: "bg-warning text-warning-foreground shadow-md hover:bg-warning/90 hover:-translate-y-0.5 active:translate-y-0",
+        glass: "bg-card/60 backdrop-blur-md border border-border/50 text-foreground hover:bg-card/80 hover:border-border shadow-card hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0",
       },
       size: {
         default: "h-11 px-5 py-2",
         sm: "h-9 rounded-lg px-4 text-xs",
         lg: "h-12 rounded-xl px-8 text-base",
         xl: "h-14 rounded-2xl px-10 text-lg",
-        icon: "h-10 w-10",
+        icon: "h-10 w-10 hover:rotate-3",
       },
     },
     defaultVariants: {
