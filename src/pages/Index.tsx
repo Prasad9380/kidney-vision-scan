@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Activity, Heart, Shield, Zap, ArrowRight, Upload, FileText, Users, Leaf } from "lucide-react";
 import heroImage from "@/assets/hero-kidney.jpg";
+import ThemeToggle from "@/components/ThemeToggle";
 
 const Index = () => {
   return (
@@ -22,7 +23,8 @@ const Index = () => {
             </div>
             <span className="font-display text-xl font-semibold">KidneyAI</span>
           </Link>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-4">
+            <ThemeToggle />
             <Link to="/login">
               <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground rounded-full">Sign In</Button>
             </Link>
