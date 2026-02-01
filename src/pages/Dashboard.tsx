@@ -93,7 +93,7 @@ const Dashboard = () => {
     setIsAnalyzing(true);
     
     try {
-      // Upload image to storage
+      // Upload image to storage and get signed URL (bucket is private)
       let imageUrl = uploadedImage;
       if (imageFile) {
         const fileExt = imageFile.name.split('.').pop();
@@ -104,10 +104,13 @@ const Dashboard = () => {
           .upload(fileName, imageFile);
 
         if (!uploadError) {
-          const { data: urlData } = supabase.storage
+          // Use signed URL for private bucket (expires in 1 year)
+          const { data: signedUrlData } = await supabase.storage
             .from('scans')
-            .getPublicUrl(fileName);
-          imageUrl = urlData.publicUrl;
+            .createSignedUrl(fileName, 60 * 60 * 24 * 365);
+          if (signedUrlData?.signedUrl) {
+            imageUrl = signedUrlData.signedUrl;
+          }
         }
       }
 
