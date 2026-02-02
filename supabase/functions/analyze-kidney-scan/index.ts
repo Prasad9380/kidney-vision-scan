@@ -59,7 +59,7 @@ serve(async (req) => {
     const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
     
     if (userError || !user) {
-      console.error("Failed to get authenticated user:", userError);
+      console.error("Authentication failed");
       return new Response(
         JSON.stringify({ error: "Invalid authentication" }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -67,7 +67,7 @@ serve(async (req) => {
     }
 
     const userId = user.id;
-    console.log("Authenticated user:", userId);
+    console.log("Request authenticated successfully");
 
     // Parse and validate input
     const body = await req.json();
@@ -84,7 +84,7 @@ serve(async (req) => {
 
     // Limit image size (10MB base64 ≈ 7.5MB actual)
     if (imageBase64.length > 10 * 1024 * 1024) {
-      console.error("Image too large:", imageBase64.length);
+      console.error("Image size exceeds limit");
       return new Response(
         JSON.stringify({ error: "Image too large (max 10MB)" }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -116,8 +116,7 @@ serve(async (req) => {
     // Sanitize notes to prevent prompt injection
     const sanitizedNotes = notes?.replace(/[<>{}]/g, '') || '';
 
-    console.log("Processing kidney scan analysis for user:", userId);
-    console.log("Additional data - BP:", bp, "Glucose:", glucose, "Notes length:", sanitizedNotes.length);
+    console.log("Processing kidney scan analysis request");
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
@@ -137,7 +136,7 @@ serve(async (req) => {
       if (sanitizedNotes) userMessage += `\n- Patient Notes: ${sanitizedNotes}`;
     }
 
-    console.log("Sending request to Lovable AI Gateway");
+    console.log("Sending request to AI Gateway");
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -168,7 +167,7 @@ serve(async (req) => {
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("AI Gateway error:", response.status, errorText);
+      console.error("AI Gateway error:", response.status);
       
       if (response.status === 429) {
         return new Response(
@@ -190,7 +189,7 @@ serve(async (req) => {
     }
 
     const data = await response.json();
-    console.log("AI Gateway response received for user:", userId);
+    console.log("AI Gateway response received successfully");
 
     const aiResponse = data.choices?.[0]?.message?.content;
     if (!aiResponse) {
@@ -211,10 +210,9 @@ serve(async (req) => {
         jsonStr = jsonMatch[1].trim();
       }
       analysisResult = JSON.parse(jsonStr);
-      console.log("Successfully parsed AI analysis for user:", userId);
+      console.log("Analysis completed successfully");
     } catch (parseError) {
-      console.error("Failed to parse AI response:", parseError);
-      console.error("Raw response:", aiResponse);
+      console.error("Failed to parse AI response");
       
       // Return a default response if parsing fails
       analysisResult = {
@@ -240,7 +238,7 @@ serve(async (req) => {
     );
 
   } catch (error: unknown) {
-    console.error("Error in analyze-kidney-scan:", error);
+    console.error("Error in analyze-kidney-scan function");
     const errorMessage = error instanceof Error ? error.message : "Internal server error";
     return new Response(
       JSON.stringify({ error: errorMessage }),
