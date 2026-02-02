@@ -38,7 +38,8 @@ serve(async (req) => {
   }
 
   try {
-    // Authentication check
+    // Authentication - JWT is automatically verified by Supabase (verify_jwt = true in config.toml)
+    // This provides defense in depth - platform-level enforcement before code execution
     const authHeader = req.headers.get('authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       console.error("Missing or invalid authorization header");
@@ -54,18 +55,18 @@ serve(async (req) => {
       { global: { headers: { Authorization: authHeader } } }
     );
 
-    const token = authHeader.replace('Bearer ', '');
-    const { data: claimsData, error: claimsError } = await supabaseClient.auth.getClaims(token);
+    // Get the authenticated user - this validates the token and provides user context
+    const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
     
-    if (claimsError || !claimsData?.claims) {
-      console.error("Invalid authentication token:", claimsError);
+    if (userError || !user) {
+      console.error("Failed to get authenticated user:", userError);
       return new Response(
         JSON.stringify({ error: "Invalid authentication" }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    const userId = claimsData.claims.sub;
+    const userId = user.id;
     console.log("Authenticated user:", userId);
 
     // Parse and validate input
