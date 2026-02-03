@@ -21,8 +21,12 @@ export type Database = {
           full_name: string | null
           glucose_level: string | null
           id: string
+          phone_number: string | null
+          share_email_enabled: boolean | null
+          share_whatsapp_enabled: boolean | null
           updated_at: string
           user_id: string
+          whatsapp_number: string | null
         }
         Insert: {
           blood_pressure?: string | null
@@ -30,8 +34,12 @@ export type Database = {
           full_name?: string | null
           glucose_level?: string | null
           id?: string
+          phone_number?: string | null
+          share_email_enabled?: boolean | null
+          share_whatsapp_enabled?: boolean | null
           updated_at?: string
           user_id: string
+          whatsapp_number?: string | null
         }
         Update: {
           blood_pressure?: string | null
@@ -39,8 +47,12 @@ export type Database = {
           full_name?: string | null
           glucose_level?: string | null
           id?: string
+          phone_number?: string | null
+          share_email_enabled?: boolean | null
+          share_whatsapp_enabled?: boolean | null
           updated_at?: string
           user_id?: string
+          whatsapp_number?: string | null
         }
         Relationships: []
       }
